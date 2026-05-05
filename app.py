@@ -1,12 +1,12 @@
 """
 AI Resume Builder — INT428 Project  ★ PREMIUM VERSION ★
-Features : Space Splash · Login/Signup · Gemini AI · ATS Score · Job Tailor
+Features : Space Splash · Login/Signup · SambaNova AI · ATS Score · Job Tailor
            Cover Letter · Interview Q&A · Skill Gap · LinkedIn Summary · PDF Export
-API      : Google Gemini (gemini-1.5-flash-8b) — FREE · gemini-1.5-flash-8b
+API      : SambaNova Cloud API (LLaMA 4 Scout) — FREE
 """
 
 import streamlit as st
-import google.generativeai as genai
+from openai import OpenAI
 import sqlite3, hashlib, re, io
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
@@ -56,7 +56,7 @@ def valid_email(e): return bool(re.match(r"^[\w\.-]+@[\w\.-]+\.\w{2,}$", e))
 # SESSION
 # ─────────────────────────────────────────────
 D = {"page":"splash","logged_in":False,"user_name":"","user_email":"",
-     "api_key":"","api_ok":False,"temp":0.2,"topp":0.85,
+     "api_key":"","api_ok":False,"temp":0.7,"topp":0.9,
      "resume_done":False,"resume_md":"","chat":[],"full_name":"",
      "job_title":"","email":"","phone":"","location":"","summary":"",
      "experience":"","education":"","skills":"",
@@ -67,34 +67,33 @@ for k,v in D.items():
     if k not in st.session_state: st.session_state[k]=v
 
 # ─────────────────────────────────────────────
-# GEMINI
+# SAMBANOVA AI
 # ─────────────────────────────────────────────
 SYSTEM = """You are ResumeAI, a Professional Career Coach and Resume Expert.
 DOMAIN: Career, resumes, cover letters, job search, interview tips, LinkedIn only.
 If asked off-topic: "I specialize in career development only. Let me help with your resume!"
 Use professional language, strong action verbs, quantify achievements."""
 
-def call_gemini(prompt, temp=0.2, topp=0.85, ctx=""):
-    import time
-    genai.configure(api_key=st.session_state.api_key)
-    model = genai.GenerativeModel(
-        "gemini-1.5-flash-8b",
-        generation_config=genai.GenerationConfig(temperature=temp, top_p=topp, max_output_tokens=2048),
-        system_instruction=SYSTEM)
-    full = f"EXISTING RESUME:\n{ctx}\n\nREQUEST:\n{prompt}" if ctx else prompt
-    # Retry up to 4 times with backoff on quota errors
-    for attempt in range(4):
-        try:
-            return model.generate_content(full).text
-        except Exception as e:
-            err = str(e)
-            if "429" in err or "quota" in err.lower() or "rate" in err.lower():
-                wait = [15, 30, 60, 120][attempt]
-                st.warning(f"⏳ API quota hit — waiting {wait}s then retrying (attempt {attempt+1}/4)...")
-                time.sleep(wait)
-            else:
-                return f"⚠️ Error: {err}"
-    return "⚠️ Quota still exceeded. Please wait 1 minute and try again."
+def call_sambanova(prompt, temp=0.7, topp=0.9, ctx=""):
+    try:
+        client = OpenAI(
+            base_url="https://api.sambanova.ai/v1",
+            api_key=st.session_state.api_key
+        )
+        full = f"EXISTING RESUME:\n{ctx}\n\nREQUEST:\n{prompt}" if ctx else prompt
+        response = client.chat.completions.create(
+            model="Meta-Llama-4-Scout-17B-16E-Instruct",
+            temperature=temp,
+            top_p=topp,
+            max_tokens=2048,
+            messages=[
+                {"role": "system", "content": SYSTEM},
+                {"role": "user", "content": full}
+            ]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"⚠️ Error: {str(e)}"
 
 def build_resume_prompt(d):
     return f"""Generate a complete ATS-optimized professional resume in clean Markdown.
@@ -228,7 +227,7 @@ div[data-testid="stSidebar"]{display:none;}
 """, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════
-# PAGE 1 — AI RESUME BUILDER SPLASH
+# PAGE 1 — SPLASH
 # ══════════════════════════════════════════════
 def show_splash():
     st.markdown("""
@@ -359,7 +358,7 @@ def show_splash():
       <div class="rs"><div class="rst st-b"></div><div class="rl w80"></div><div class="rl w70"></div><div class="rl w90"></div><div class="rl w55"></div></div>
       <div class="rs"><div class="rst st-y"></div><div class="rl w75"></div><div class="rl w65"></div></div>
     </div>
-    <div class="mc mc1"><span class="mci">🤖</span><span class="mct">GEMINI AI</span><div class="mcv">ACTIVE</div></div>
+    <div class="mc mc1"><span class="mci">🤖</span><span class="mct">LLAMA 4</span><div class="mcv">ACTIVE</div></div>
     <div class="mc mc2"><span class="mci">📊</span><span class="mct">ATS SCORE</span><div class="mcv">98/100</div></div>
     <div class="mc mc3"><span class="mci">✅</span><span class="mct">OPTIMIZED</span></div>
     <div class="aic"><div class="air"></div><div class="air"></div><div class="air"></div><div class="aicore">🧠</div></div>
@@ -368,9 +367,9 @@ def show_splash():
     <div class="tagline">✦ INT428 · Generative AI · 2026 ✦</div>
     <div class="mtitle">AI RESUME<br>BUILDER</div>
     <div class="msub">★ Career Intelligence Platform ★</div>
-    <div class="mdesc">Build ATS-optimized resumes in seconds. Score, tailor, generate cover letters, prep for interviews — powered by Gemini 1.5 Flash-8B.</div>
+    <div class="mdesc">Build ATS-optimized resumes in seconds. Score, tailor, generate cover letters, prep for interviews — powered by SambaNova LLaMA 4.</div>
     <div class="flist">
-      <div class="fi"><div class="fdot"></div><div class="flbl">AI Resume Generation</div><div class="fbdg">GEMINI</div></div>
+      <div class="fi"><div class="fdot"></div><div class="flbl">AI Resume Generation</div><div class="fbdg">LLAMA 4</div></div>
       <div class="fi"><div class="fdot" style="background:#40b0ff;box-shadow:0 0 7px #40b0ff"></div><div class="flbl">ATS Score Analyzer</div><div class="fbdg" style="color:#40b0ff;border-color:rgba(64,176,255,.2)">100/100</div></div>
       <div class="fi"><div class="fdot" style="background:#ffb040;box-shadow:0 0 7px #ffb040"></div><div class="flbl">Job Description Tailoring</div><div class="fbdg" style="color:#ffb040;border-color:rgba(255,176,64,.2)">SMART</div></div>
       <div class="fi"><div class="fdot" style="background:#c040ff;box-shadow:0 0 7px #c040ff"></div><div class="flbl">PDF Export + Cover Letter</div><div class="fbdg" style="color:#c040ff;border-color:rgba(192,64,255,.2)">FREE</div></div>
@@ -383,7 +382,7 @@ def show_splash():
       <div class="sb2"><span class="sbn2">FREE</span><span class="sbl2">API</span></div>
     </div>
     <div class="hud">
-      <div class="hi"><div class="hg"></div>GEMINI 1.5-8B ONLINE</div>
+      <div class="hi"><div class="hg"></div>LLAMA 4 MAVERICK ONLINE</div>
       <div class="hi"><div class="hb"></div>ATS ENGINE ACTIVE</div>
       <div class="hi"><div class="hy"></div>PDF READY</div>
       <div class="hi"><div class="hg"></div>DOMAIN LOCKED</div>
@@ -396,7 +395,7 @@ def show_splash():
     with c:
         if st.button("🚀  Enter Dashboard", use_container_width=True):
             st.session_state.page="auth"; st.rerun()
-    st.markdown('<div class="sfoot2">Powered by Google Gemini 1.5 Flash-8B &nbsp;•&nbsp; Python + Streamlit &nbsp;•&nbsp; INT428 © 2026</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sfoot2">Powered by SambaNova LLaMA 4 &nbsp;•&nbsp; Python + Streamlit &nbsp;•&nbsp; INT428 © 2026</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════
 # PAGE 2 — AUTH
@@ -414,18 +413,19 @@ background:linear-gradient(135deg,#4090ff,#80c4ff);
 text-align:center;margin-bottom:.2rem">AI RESUME BUILDER</div>
 <div style="text-align:center;color:#102030;font-size:.8rem;margin-bottom:1.4rem">Sign in or create your account</div>
 """, unsafe_allow_html=True)
-        # API Key - shown above both tabs
+
         st.markdown("""
 <div style="background:rgba(64,255,176,.05);border:1px solid rgba(64,255,176,.25);
 border-radius:10px;padding:1rem 1.1rem;margin-bottom:1rem">
 <div style="color:#40ffb0;font-weight:700;font-size:.85rem;margin-bottom:.5rem">
-🔑 Google Gemini API Key (FREE)</div>
+🔑 SambaNova Cloud API Key (FREE)</div>
 <div style="color:#1a4a3a;font-size:.75rem;line-height:1.6">
-Get free key → <strong style="color:#40c090">aistudio.google.com/app/apikey</strong><br>
-Sign in with Gmail → Create API Key → Copy & paste below
+Get free key → <strong style="color:#40c090">cloud.sambanova.ai</strong><br>
+Sign up → Go to API Keys → Generate New Key → Copy & paste below
 </div></div>""", unsafe_allow_html=True)
-        api_key_input = st.text_input("Paste Gemini API Key here", key="auth_api",
-                                       type="password", placeholder="AIzaSy...")
+
+        api_key_input = st.text_input("Paste SambaNova API Key here", key="auth_api",
+                                       type="password", placeholder="sn-proj-...")
         st.markdown('<hr style="border-color:rgba(96,180,255,0.1);margin:.6rem 0">',unsafe_allow_html=True)
 
         tl, ts = st.tabs(["🔑  Login","✨  Create Account"])
@@ -438,20 +438,25 @@ Sign in with Gmail → Create API Key → Copy & paste below
                 if not le or not lp:
                     st.error("Please fill email and password.")
                 elif not api_key_input:
-                    st.error("Please enter your Gemini API key above.")
-                elif not api_key_input.startswith("AIza"):
-                    st.error("Invalid key. Should start with AIza...")
+                    st.error("Please enter your SambaNova API key above.")
                 else:
                     ok,name,email = login(le,lp)
                     if ok:
                         with st.spinner("Verifying API key..."):
                             try:
-                                genai.configure(api_key=api_key_input)
-                                genai.GenerativeModel("gemini-1.5-flash-8b").generate_content("hi")
+                                client = OpenAI(
+                                    base_url="https://api.sambanova.ai/v1",
+                                    api_key=api_key_input
+                                )
+                                client.chat.completions.create(
+                                    model="Meta-Llama-4-Scout-17B-16E-Instruct",
+                                    max_tokens=5,
+                                    messages=[{"role":"user","content":"hi"}]
+                                )
                                 st.session_state.update({
                                     "logged_in":True,"user_name":name,"user_email":email,
                                     "full_name":name,"api_key":api_key_input,
-                                    "api_ok":True,"temp":0.2,"topp":0.85,"page":"main"})
+                                    "api_ok":True,"temp":0.7,"topp":0.9,"page":"main"})
                                 st.success(f"✅ Welcome, {name}!"); st.rerun()
                             except Exception as e:
                                 st.error(f"❌ API Error: {str(e)}")
@@ -468,19 +473,25 @@ Sign in with Gmail → Create API Key → Copy & paste below
                 elif not valid_email(re_): st.error("Enter a valid email.")
                 elif len(rp)<6: st.error("Password min 6 characters.")
                 elif rp!=rp2: st.error("Passwords don't match.")
-                elif not api_key_input: st.error("Please enter your Gemini API key above.")
-                elif not api_key_input.startswith("AIza"): st.error("Invalid key. Should start with AIza...")
+                elif not api_key_input: st.error("Please enter your SambaNova API key above.")
                 else:
                     ok,msg=register(rn,re_,rp)
                     if ok:
                         with st.spinner("Verifying API key..."):
                             try:
-                                genai.configure(api_key=api_key_input)
-                                genai.GenerativeModel("gemini-1.5-flash-8b").generate_content("hi")
+                                client = OpenAI(
+                                    base_url="https://api.sambanova.ai/v1",
+                                    api_key=api_key_input
+                                )
+                                client.chat.completions.create(
+                                    model="Meta-Llama-4-Scout-17B-16E-Instruct",
+                                    max_tokens=5,
+                                    messages=[{"role":"user","content":"hi"}]
+                                )
                                 st.session_state.update({
                                     "logged_in":True,"user_name":rn,"user_email":re_,
                                     "full_name":rn,"api_key":api_key_input,
-                                    "api_ok":True,"temp":0.2,"topp":0.85,"page":"main"})
+                                    "api_ok":True,"temp":0.7,"topp":0.9,"page":"main"})
                                 st.success(f"✅ Account created! Welcome, {rn}!"); st.rerun()
                             except Exception as e:
                                 st.error(f"❌ API Error: {str(e)}")
@@ -495,40 +506,45 @@ def show_api_setup():
 background:linear-gradient(135deg,#4090ff,#40ffb0);
 -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.3rem">
 🔑 API Configuration</div>""",unsafe_allow_html=True)
-    st.markdown(f'<div style="color:#1a3a50;margin-bottom:1.4rem">Welcome, <strong style="color:#60b4ff">{st.session_state.user_name}</strong>! Set up your free Google Gemini API key.</div>',unsafe_allow_html=True)
+    st.markdown(f'<div style="color:#1a3a50;margin-bottom:1.4rem">Welcome, <strong style="color:#60b4ff">{st.session_state.user_name}</strong>! Update your SambaNova API key or model settings.</div>',unsafe_allow_html=True)
     c1,c2=st.columns([1.2,1],gap="large")
     with c1:
-        st.markdown('<div class="sh">🚀 Get Your FREE Gemini API Key</div>',unsafe_allow_html=True)
+        st.markdown('<div class="sh">🚀 Get Your FREE SambaNova API Key</div>',unsafe_allow_html=True)
         for num,title,desc in [
-            ("1","Open Google AI Studio","Go to: aistudio.google.com/app/apikey"),
-            ("2","Sign In","Use any Google / Gmail account — free"),
-            ("3","Create API Key","Click 'Create API Key' → Copy it"),
-            ("4","Paste Below","Key starts with AIza..."),]:
+            ("1","Open SambaNova Cloud","Go to: cloud.sambanova.ai"),
+            ("2","Sign Up Free","Use any email — no credit card needed"),
+            ("3","Generate API Key","Go to API Keys → Generate New Key"),
+            ("4","Paste Below","Key starts with sn-proj-..."),]:
             st.markdown(f'<div class="scard"><span class="snum">{num}</span><strong style="color:#90b8d8">{title}</strong><br><span style="color:#1a3a50;font-size:.82rem;margin-left:35px">{desc}</span></div>',unsafe_allow_html=True)
         st.markdown("""<div style="background:rgba(64,255,176,.05);border:1px solid rgba(64,255,176,.15);
 border-radius:10px;padding:.9rem 1.1rem;font-size:.82rem;color:#1a4a3a">
-✅ <strong style="color:#40ffb0">4000 free requests/day</strong><br>
-✅ No credit card required<br>✅ Works with any Gmail</div>""",unsafe_allow_html=True)
+✅ <strong style="color:#40ffb0">4000+ free requests/day</strong><br>
+✅ No credit card required<br>✅ LLaMA 4 Scout access</div>""",unsafe_allow_html=True)
     with c2:
         st.markdown('<div class="sh">🔐 Enter API Key</div>',unsafe_allow_html=True)
-        api_in=st.text_input("Google Gemini API Key",type="password",placeholder="AIzaSy...")
+        api_in=st.text_input("SambaNova API Key",type="password",placeholder="sn-proj-...")
         st.markdown("---")
         st.markdown('<div class="sh">⚙️ Model Settings</div>',unsafe_allow_html=True)
-        temp=st.slider("🌡️ Temperature",0.0,1.0,0.2,0.05)
-        topp=st.slider("🎯 Top-p",0.1,1.0,0.85,0.05)
+        temp=st.slider("🌡️ Temperature",0.0,1.0,0.7,0.05)
+        topp=st.slider("🎯 Top-p",0.1,1.0,0.9,0.05)
         st.markdown(f"""<div style="background:rgba(64,144,255,.06);border:1px solid rgba(64,144,255,.14);
 border-radius:8px;padding:9px 13px;font-size:.8rem;color:#1a3050;margin-bottom:.9rem">
-🌡️ Temp <strong style="color:#60b4ff">{temp}</strong> — {"✅ Precise & professional" if temp<=0.4 else "⚠️"}<br>
+🌡️ Temp <strong style="color:#60b4ff">{temp}</strong> — {"✅ Balanced & professional" if temp<=0.8 else "⚠️ Very creative"}<br>
 🎯 Top-p <strong style="color:#60b4ff">{topp}</strong> — Top {int(topp*100)}% tokens</div>""",unsafe_allow_html=True)
         if st.button("✅  Connect & Continue →",use_container_width=True):
             if not api_in: st.error("Please enter your API key.")
-            elif not api_in.startswith("AIza"): st.error("Invalid key. Should start with AIza...")
             else:
                 with st.spinner("Verifying..."):
                     try:
-                        genai.configure(api_key=api_in)
-                        m=genai.GenerativeModel("gemini-1.5-flash-8b")
-                        m.generate_content("hi")
+                        client = OpenAI(
+                            base_url="https://api.sambanova.ai/v1",
+                            api_key=api_in
+                        )
+                        client.chat.completions.create(
+                            model="Meta-Llama-4-Scout-17B-16E-Instruct",
+                            max_tokens=5,
+                            messages=[{"role":"user","content":"hi"}]
+                        )
                         st.session_state.update({"api_key":api_in,"api_ok":True,
                             "temp":temp,"topp":topp,"page":"main"})
                         st.success("✅ Connected!"); st.rerun()
@@ -539,13 +555,12 @@ border-radius:8px;padding:9px 13px;font-size:.8rem;color:#1a3050;margin-bottom:.
         st.rerun()
 
 # ══════════════════════════════════════════════
-# PAGE 4 — MAIN APP (ALL FEATURES)
+# PAGE 4 — MAIN APP
 # ══════════════════════════════════════════════
 def show_main():
-    temp=st.session_state.get("temp",0.2)
-    topp=st.session_state.get("topp",0.85)
+    temp=st.session_state.get("temp",0.7)
+    topp=st.session_state.get("topp",0.9)
 
-    # NAV BAR
     n1,n2,n3,n4=st.columns([3,1,1,1])
     with n1:
         st.markdown("""<div style="padding:5px 0">
@@ -553,7 +568,7 @@ def show_main():
 background:linear-gradient(135deg,#4090ff,#40ffb0);
 -webkit-background-clip:text;-webkit-text-fill-color:transparent">
 📄 AI RESUME BUILDER</span>
-<span style="color:#0f2030;font-size:.76rem;margin-left:10px">INT428 · Gemini AI · Premium</span>
+<span style="color:#0f2030;font-size:.76rem;margin-left:10px">INT428 · SambaNova LLaMA 4 · Premium</span>
 </div>""",unsafe_allow_html=True)
     with n2:
         st.markdown(f'<div style="text-align:center;padding-top:7px"><span style="background:rgba(64,144,255,.1);border:1px solid rgba(64,144,255,.2);border-radius:20px;padding:4px 12px;color:#4090ff;font-size:.76rem">👤 {st.session_state.user_name.split()[0]}</span></div>',unsafe_allow_html=True)
@@ -565,13 +580,12 @@ background:linear-gradient(135deg,#4090ff,#40ffb0);
 
     st.markdown('<hr style="border-color:rgba(64,144,255,.1);margin:5px 0 16px">',unsafe_allow_html=True)
 
-    # ALL TABS
     tab1,tab2,tab3,tab4,tab5,tab6,tab7,tab8 = st.tabs([
         "✍️ Build","💬 Chat","📊 ATS Score",
         "🎯 Job Tailor","📝 Cover Letter",
         "❓ Interview Prep","🔍 Skill Gap","💼 LinkedIn"])
 
-    # ════ TAB 1 — BUILD RESUME ════
+    # ════ TAB 1 — BUILD ════
     with tab1:
         cl,cr=st.columns([1,1],gap="large")
         with cl:
@@ -590,7 +604,7 @@ background:linear-gradient(135deg,#4090ff,#40ffb0);
             st.session_state.experience=st.text_area("Work Experience *",value=st.session_state.experience,height=120,
                 placeholder="Software Engineer at TCS (2021–Now)\n- Built REST APIs\n- Reduced load time by 40%")
             st.session_state.education=st.text_area("Education *",value=st.session_state.education,height=60,
-                placeholder="B.Tech CSE — GGSIPU (2018–2022)")
+                placeholder="B.Tech CSE — LPU (2022–2026)")
             st.session_state.skills=st.text_area("Skills *",value=st.session_state.skills,height=60,
                 placeholder="Python, React, SQL, AWS, Docker, Git")
 
@@ -623,8 +637,8 @@ background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-r
                      st.session_state.education,st.session_state.skills])
             if not req: st.info("📝 Fill Name, Job Title, Education & Skills.")
             if st.button("✨  Generate Resume",disabled=not req,use_container_width=True):
-                with st.spinner("🤖 Gemini AI is crafting your resume..."):
-                    res=call_gemini(build_resume_prompt({
+                with st.spinner("🤖 LLaMA 4 is crafting your resume..."):
+                    res=call_sambanova(build_resume_prompt({
                         "full_name":st.session_state.full_name,"job_title":st.session_state.job_title,
                         "email":st.session_state.email,"phone":st.session_state.phone,
                         "location":st.session_state.location,"summary":st.session_state.summary,
@@ -653,13 +667,12 @@ box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:65vh;overflow-y:auto">
                     st.download_button("⬇️ Text",data=st.session_state.resume_md,
                         file_name=f"resume_{fn}.txt",mime="text/plain",use_container_width=True)
                 with d3:
-                    # PDF Export
                     try:
                         pdf_bytes=generate_pdf(st.session_state.resume_md,st.session_state.rcolor)
                         st.download_button("⬇️ PDF",data=pdf_bytes,
                             file_name=f"resume_{fn}.pdf",mime="application/pdf",use_container_width=True)
                     except Exception as e:
-                        st.button("⬇️ PDF (install reportlab)",disabled=True,use_container_width=True)
+                        st.button("⬇️ PDF (error)",disabled=True,use_container_width=True)
             else:
                 st.markdown(f"""<div style="text-align:center;padding:5rem 1.5rem;
 border:2px dashed rgba(64,144,255,.1);border-radius:12px">
@@ -679,11 +692,11 @@ border:2px dashed rgba(64,144,255,.1);border-radius:12px">
                 css="cu" if m["role"]=="user" else "cb"
                 ic="👤" if m["role"]=="user" else "🤖"
                 st.markdown(f'<div class="{css}">{ic} {m["content"]}</div>',unsafe_allow_html=True)
-            um=st.chat_input("Ask Gemini to edit your resume...")
+            um=st.chat_input("Ask LLaMA 4 to edit your resume...")
             if um:
                 st.session_state.chat.append({"role":"user","content":um})
-                with st.spinner("Gemini is thinking..."):
-                    reply=call_gemini(um,temp,topp,ctx=st.session_state.resume_md)
+                with st.spinner("LLaMA 4 is thinking..."):
+                    reply=call_sambanova(um,temp,topp,ctx=st.session_state.resume_md)
                 if "##" in reply and len(reply)>300:
                     st.session_state.resume_md=reply
                     reply="✅ Resume updated! Switch to Build tab to see changes."
@@ -701,26 +714,22 @@ border:2px dashed rgba(64,144,255,.1);border-radius:12px">
                 with st.spinner("🤖 Analyzing your resume against ATS criteria..."):
                     prompt=f"""Analyze this resume for ATS (Applicant Tracking System) compatibility.
 Resume:\n{st.session_state.resume_md}
-
 Provide:
 1. ATS SCORE: X/100 (on its own line, clearly stated)
 2. STRENGTHS: What's working well (3-4 bullet points)
 3. WEAKNESSES: What needs improvement (3-4 bullet points)
 4. MISSING KEYWORDS: Important keywords that should be added
 5. TOP 5 IMPROVEMENTS: Specific actionable steps to increase the score
-
 Be specific and professional."""
-                    st.session_state.ats_score=call_gemini(prompt,0.2,0.85)
+                    st.session_state.ats_score=call_sambanova(prompt,0.2,0.85)
 
             if st.session_state.ats_score:
-                # Extract score number
                 score_text=st.session_state.ats_score
                 score_num=None
                 for line in score_text.split('\n'):
                     if '/100' in line:
                         nums=re.findall(r'\d+',line)
                         if nums: score_num=int(nums[0]); break
-
                 if score_num:
                     color="#22c55e" if score_num>=80 else "#f59e0b" if score_num>=60 else "#ef4444"
                     st.markdown(f"""
@@ -731,7 +740,6 @@ border:1px solid {color}40;border-radius:16px;margin-bottom:1.2rem">
 <div style="color:{color};font-size:.85rem;margin-top:.4rem;font-weight:600">
 {"🟢 Excellent!" if score_num>=80 else "🟡 Good — needs improvement" if score_num>=60 else "🔴 Needs significant improvement"}
 </div></div>""",unsafe_allow_html=True)
-
                 st.markdown(f'<div class="feature-result">{score_text}</div>',unsafe_allow_html=True)
 
     # ════ TAB 4 — JOB TAILOR ════
@@ -742,7 +750,7 @@ border:1px solid {color}40;border-radius:16px;margin-bottom:1.2rem">
         else:
             st.markdown('<div class="icard">📋 Paste a job description below → AI rewrites your resume to match that specific job with relevant keywords.</div>',unsafe_allow_html=True)
             jd=st.text_area("Paste Job Description Here",height=200,
-                placeholder="Software Engineer at Google\nRequirements:\n- 3+ years Python experience\n- REST API development\n- Cloud experience (AWS/GCP)\n...")
+                placeholder="Software Engineer at Google\nRequirements:\n- 3+ years Python experience\n- REST API development\n...")
             if st.button("🎯  Tailor My Resume for This Job",disabled=not jd.strip(),use_container_width=True):
                 with st.spinner("🤖 Tailoring your resume for this job..."):
                     prompt=f"""Tailor this resume specifically for the job description below.
@@ -754,7 +762,7 @@ Instructions:
 - Highlight experiences most relevant to this role
 - Keep same Markdown format (# name, ## sections, ### job titles)
 - Output ONLY the tailored resume Markdown."""
-                    st.session_state.tailored_resume=call_gemini(prompt,0.3,0.85)
+                    st.session_state.tailored_resume=call_sambanova(prompt,0.3,0.85)
 
             if st.session_state.tailored_resume:
                 st.success("✅ Tailored resume ready!")
@@ -802,7 +810,7 @@ Instructions:
 - Reference specific achievements from the resume
 - End with a call to action
 Output ONLY the cover letter text."""
-                    st.session_state.cover_letter=call_gemini(prompt,0.4,0.9)
+                    st.session_state.cover_letter=call_sambanova(prompt,0.4,0.9)
 
             if st.session_state.cover_letter:
                 st.markdown(f'<div class="feature-result">{st.session_state.cover_letter}</div>',unsafe_allow_html=True)
@@ -831,7 +839,7 @@ Format each as:
 Q[number]: [Question]
 A: [Suggested Answer — 2-3 sentences, professional, using STAR method where applicable]
 Be specific to the candidate's experience."""
-                    st.session_state.interview_qa=call_gemini(prompt,0.4,0.9)
+                    st.session_state.interview_qa=call_sambanova(prompt,0.4,0.9)
 
             if st.session_state.interview_qa:
                 st.markdown(f'<div class="feature-result">{st.session_state.interview_qa}</div>',unsafe_allow_html=True)
@@ -858,7 +866,7 @@ Provide:
 4. LEARNING ROADMAP: Specific resources/courses to fill gaps (free ones preferred)
 5. ESTIMATED TIME: How long to bridge the gap
 Be specific and encouraging."""
-                    st.session_state.skill_gap=call_gemini(prompt,0.3,0.85)
+                    st.session_state.skill_gap=call_sambanova(prompt,0.3,0.85)
 
             if st.session_state.skill_gap:
                 st.markdown(f'<div class="feature-result">{st.session_state.skill_gap}</div>',unsafe_allow_html=True)
@@ -892,7 +900,7 @@ Instructions:
 - Use emojis sparingly for visual appeal
 - Make it keyword-rich for LinkedIn search
 Output ONLY the LinkedIn About section text."""
-                    st.session_state.linkedin_sum=call_gemini(prompt,0.5,0.9)
+                    st.session_state.linkedin_sum=call_sambanova(prompt,0.5,0.9)
 
             if st.session_state.linkedin_sum:
                 st.markdown(f'<div class="feature-result">{st.session_state.linkedin_sum}</div>',unsafe_allow_html=True)
@@ -904,7 +912,7 @@ Output ONLY the LinkedIn About section text."""
                 with d2:
                     char_count=len(st.session_state.linkedin_sum)
                     color_c="#22c55e" if char_count<=2600 else "#ef4444"
-                    st.markdown(f'<div style="text-align:center;padding:.8rem;background:rgba(255,255,255,.03);border-radius:8px;color:{color_c};font-size:.85rem">{"✅" if char_count<=2600 else "⚠️"} {char_count} chars {"(within LinkedIn limit)" if char_count<=2600 else "(too long — LinkedIn max is 2600)"}</div>',unsafe_allow_html=True)
+                    st.markdown(f'<div style="text-align:center;padding:.8rem;background:rgba(255,255,255,.03);border-radius:8px;color:{color_c};font-size:.85rem">{"✅" if char_count<=2600 else "⚠️"} {char_count} chars {"(within LinkedIn limit)" if char_count<=2600 else "(too long)"}</div>',unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════
 # ROUTER
