@@ -207,7 +207,7 @@ div[data-testid="stSidebar"]{display:none;}
 .stTextArea>div>div>textarea{
     background:rgba(255,255,255,0.04)!important;
     border:1px solid rgba(100,160,255,0.2)!important;
-    border-radius:8px!important;color:#d0e8ff!important;
+    border-radius:8px!important;color:#000000!important;
     font-family:'Inter',sans-serif!important;}
 .stTextInput>div>div>input:focus,
 .stTextArea>div>div>textarea:focus{
